@@ -1,0 +1,6 @@
+{
+  "name": "Supabase Auth Setup",
+  "description": "A basic Supabase authentication integration and client setup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
