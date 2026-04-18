@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient';
-import { getCurrentOrganizationId } from './organizations';
+import { supabase } from '../lib/supabaseClient';
+import { getCurrentOrganizationId } from '../lib/organizations';
 
 export interface Branch {
   id: string;
