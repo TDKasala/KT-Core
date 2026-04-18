@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 // and must be prefixed with VITE_. If you strictly need NEXT_PUBLIC_, it would require
 // custom Vite configuration. We map it here primarily for the VITE_ equivalent.
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
@@ -16,6 +16,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // We provide placeholder fallbacks to prevent the application from crashing on load 
 // when the environment variables are not yet configured.
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
+  supabaseUrl || 'https://bkakcnintlflqfndzccl.supabase.co', 
+  supabaseAnonKey || 'sb_publishable_PO3or2oK1EAtfyQV0JJGXQ_QRlvNgte'
 );
