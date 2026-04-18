@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 export interface Organization {
@@ -23,88 +23,106 @@ export function useCurrentOrganization() {
   const [role, setRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchMemberships = useCallback(async (userId: string) => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
+        .from('memberships')
+        .select(`
+          role,
+          organization_id,
+          organizations (*)
+        `)
+        .eq('user_id', userId);
 
-    async function fetchMemberships() {
-      try {
-        setIsLoading(true);
+      if (error) throw error;
+
+      if (data) {
+        const fetchedMemberships = data as unknown as MembershipType[];
+        setMemberships(fetchedMemberships);
         
-        // 1. Get current logged-in user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          if (isMounted) setIsLoading(false);
-          return;
-        }
-
-        // 2. Fetch memberships along with the linked organization data
-        const { data, error } = await supabase
-          .from('memberships')
-          .select(`
-            role,
-            organization_id,
-            organizations (*)
-          `)
-          .eq('user_id', user.id);
-
-        if (error) {
-          throw error;
-        }
-
-        if (data && isMounted) {
-          // Type casting because we know the relation is one-to-one from membership -> organization
-          const fetchedMemberships = data as unknown as MembershipType[];
-          setMemberships(fetchedMemberships);
+        const orgs = fetchedMemberships
+          .map(m => m.organizations)
+          .filter(Boolean);
           
-          // Extract just the organization objects into an array
-          const orgs = fetchedMemberships
-            .map(m => m.organizations)
-            .filter(Boolean); // Filter out any nulls just in case
-            
-          setOrganizations(orgs);
+        setOrganizations(orgs);
 
-          // 3. Determine previously selected organization from localStorage
-          const savedId = localStorage.getItem(STORAGE_KEY);
-          let selected = null;
+        const savedId = localStorage.getItem(STORAGE_KEY);
+        let selected = null;
 
-          if (savedId) {
-            selected = orgs.find(o => o.id === savedId) || null;
-          }
-
-          // If no explicitly saved (or matched) organization, default to the first one available
-          if (!selected && orgs.length > 0) {
-            selected = orgs[0];
-            localStorage.setItem(STORAGE_KEY, selected.id);
-          }
-
-          setCurrentOrganizationState(selected);
-          
-          // Determine the user's role in the currently selected organization
-          if (selected) {
-            const currentMembership = fetchedMemberships.find(m => m.organization_id === selected.id);
-            setRole(currentMembership ? currentMembership.role : null);
-          }
+        if (savedId) {
+          selected = orgs.find(o => o.id === savedId) || null;
         }
-      } catch (error) {
-        console.error('Failed to fetch memberships:', error);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
+
+        if (!selected && orgs.length > 0) {
+          selected = orgs[0];
+          localStorage.setItem(STORAGE_KEY, selected.id);
+        }
+
+        setCurrentOrganizationState(selected);
+        
+        if (selected) {
+          const currentMembership = fetchedMemberships.find(m => m.organization_id === selected.id);
+          setRole(currentMembership ? currentMembership.role : null);
+        } else {
+          setRole(null);
         }
       }
+    } catch (error) {
+      console.error('Failed to fetch memberships:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let authSubscription: any = null;
+
+    async function init() {
+      // 1. Initial check
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && isMounted) {
+        await fetchMemberships(session.user.id);
+      } else if (isMounted) {
+        setIsLoading(false);
+      }
+
+      // 2. Listen for auth changes to re-fetch
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (!isMounted) return;
+        
+        if (session?.user) {
+          await fetchMemberships(session.user.id);
+        } else {
+          setOrganizations([]);
+          setCurrentOrganizationState(null);
+          setMemberships([]);
+          setRole(null);
+          setIsLoading(false);
+        }
+      });
+      authSubscription = subscription;
     }
 
-    fetchMemberships();
+    init();
+
+    // 3. Mandatory timeout to prevent infinite loading state in case of network or internal hanging
+    const timeoutId = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.warn('Organization loading timed out');
+        setIsLoading(false);
+      }
+    }, 5000);
 
     return () => {
       isMounted = false;
+      if (authSubscription) authSubscription.unsubscribe();
+      clearTimeout(timeoutId);
     };
-  }, []);
+  }, [fetchMemberships]);
 
-  /**
-   * Helper function to change the current organization
-   * Updates state, recalculates role, and stores the newly selected ID in localStorage.
-   */
   const setCurrentOrganization = (orgId: string) => {
     const selected = organizations.find(o => o.id === orgId) || null;
     setCurrentOrganizationState(selected);

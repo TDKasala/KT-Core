@@ -27,20 +27,16 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isAuthenticated === false) {
-      // Not logged in -> must be on /login
       if (location.pathname !== '/login') {
         navigate('/login', { replace: true });
       }
     } else if (isAuthenticated === true && !isOrgLoading) {
-      // Logged in and orgs loaded
       if (organizations.length === 0) {
-        // Logged in but ZERO orgs
         if (location.pathname !== '/onboarding') {
           navigate('/onboarding', { replace: true });
         }
       } else {
-        // Logged in and HAS orgs
-        if (location.pathname === '/onboarding' || location.pathname === '/login') {
+        if (location.pathname === '/onboarding' || location.pathname === '/login' || location.pathname === '/') {
           navigate('/dashboard', { replace: true });
         }
       }
@@ -48,13 +44,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, isOrgLoading, organizations.length, navigate, location.pathname]);
 
   // Loading state blocking visual flash before accurate redirects hit
-  if (isAuthenticated === null || (isAuthenticated && isOrgLoading)) {
+  // We add a safety check for isOrgLoading to ensure we don't hang if organizations are actually 
+  // available but the hook hasn't toggled isLoading yet.
+  const isReallyLoading = isAuthenticated === null || (isAuthenticated && isOrgLoading && organizations.length === 0);
+
+  if (isReallyLoading) {
     return (
       <div className="min-h-screen bg-[#121212] flex items-center justify-center">
-        <div className="w-8 h-8 flex items-center justify-center gap-1">
-           <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-bounce" />
-           <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-bounce [animation-delay:0.2s]" />
-           <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-bounce [animation-delay:0.4s]" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 flex items-center justify-center gap-1">
+             <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-bounce" />
+             <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-bounce [animation-delay:0.2s]" />
+             <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-bounce [animation-delay:0.4s]" />
+          </div>
+          <p className="text-[#a0a0a0] font-mono text-[10px] uppercase tracking-widest animate-pulse">Initialisation...</p>
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
 {
-  "name": "Supabase Auth Setup",
-  "description": "A basic Supabase authentication integration and client setup.",
+  "name": "Oasis Multi-Org Dashboard",
+  "description": "Système de gestion multi-organisation avec authentification Supabase et gestion de tâches.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

@@ -44,6 +44,23 @@ export async function signUp(
 }
 
 /**
+ * Ensure a profile exists for the user. Used during sign in or onboarding 
+ * to recover from cases where the profile wasn't created during sign up.
+ */
+export async function ensureProfile(user: User, full_name?: string, phone?: string) {
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (!existing) {
+    const name = full_name || user.email?.split('@')[0] || 'User';
+    return await createProfile(user, name, phone || '');
+  }
+}
+
+/**
  * Sign in an existing user with their email and password.
  */
 export async function signIn(credentials: SignInWithPasswordCredentials) {
@@ -52,6 +69,14 @@ export async function signIn(credentials: SignInWithPasswordCredentials) {
   if (error) {
     console.error('Sign in error:', error.message);
     throw error;
+  }
+
+  if (data.user) {
+    try {
+      await ensureProfile(data.user);
+    } catch (e) {
+      console.warn('Could not ensure profile exists:', e);
+    }
   }
   
   return data;

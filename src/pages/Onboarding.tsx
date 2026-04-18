@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { createOrganizationWithOwner } from '../lib/organizations';
+import { ensureProfile } from '../lib/auth';
 
 export default function Onboarding() {
   const [name, setName] = useState('');
@@ -15,15 +16,28 @@ export default function Onboarding() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
+      if (!user) throw new Error("Utilisateur non trouvé");
       
-      await createOrganizationWithOwner(name, type, user.id);
+      console.log('Onboarding: Ensuring profile exists...');
+      // 1. Ensure profile exists (timeout protected)
+      await Promise.race([
+        ensureProfile(user),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Délai d'attente dépassé (Profil)")), 8000))
+      ]);
       
-      // We hard-reload window to re-bootstrap everything clean through AuthGuard 
-      // catching all the new memberships instantly without complex state prop drilling.
-      window.location.href = '/dashboard';
+      console.log('Onboarding: Creating organization...');
+      // 2. Create organization (timeout protected)
+      await Promise.race([
+        createOrganizationWithOwner(name, type, user.id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Délai d'attente dépassé (Organisation)")), 8000))
+      ]);
+      
+      console.log('Onboarding: Success, redirecting...');
+      // Use replace for a cleaner transition that won't show 'loading' again if they hit back
+      window.location.replace('/dashboard');
     } catch (err: any) {
-      setError(err.message);
+      console.error('Onboarding Error:', err);
+      setError(err.message || "Une erreur inattendue est survenue");
       setIsLoading(false);
     }
   };
