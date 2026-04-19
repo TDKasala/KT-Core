@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentOrganization } from '../hooks/useCurrentOrganization';
-import { signOut } from '../lib/auth';
+import { signOut, isSuperAdmin } from '../lib/auth';
 import { supabase } from '../lib/supabaseClient';
 import { ShoppingCart, LayoutGrid, Settings, Users } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export default function Dashboard() {
   const { currentOrganization, role } = useCurrentOrganization();
   const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState('');
+  const [isSupAdmin, setIsSupAdmin] = useState(false);
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -16,21 +17,20 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    async function getTodos() {
+    async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
-        .from('todos')
-        .select('*')
-        .eq('user_id', user.id);
+      const [adminStatus, todosResult] = await Promise.all([
+        isSuperAdmin(user.id),
+        supabase.from('todos').select('*').eq('user_id', user.id),
+      ]);
 
-      if (data) {
-        setTodos(data);
-      }
+      setIsSupAdmin(adminStatus);
+      if (todosResult.data) setTodos(todosResult.data);
     }
 
-    getTodos();
+    init();
   }, []);
 
   const addTodo = async (e: React.FormEvent) => {
@@ -98,15 +98,17 @@ export default function Dashboard() {
                 <span className="text-xs font-bold text-[#ededed]">Produits</span>
               </button>
 
-              <button 
-                onClick={() => navigate('/superadmin')}
-                className="flex flex-col items-center justify-center aspect-square rounded-xl bg-[#181818] border border-[#2e2e2e] hover:border-[#a0a0a0] hover:bg-[#ff5f56]/10 hover:border-[#ff5f56]/30 transition-all group lg:col-span-2"
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#ff5f56]/20 mb-3 group-hover:scale-110 transition-transform">
-                  <Settings size={20} className="text-[#ff5f56]" />
-                </div>
-                <span className="text-xs font-bold text-[#ff5f56]">Super Admin</span>
-              </button>
+              {isSupAdmin && (
+                <button
+                  onClick={() => navigate('/superadmin')}
+                  className="flex flex-col items-center justify-center aspect-square rounded-xl bg-[#181818] border border-[#2e2e2e] hover:border-[#a0a0a0] hover:bg-[#ff5f56]/10 hover:border-[#ff5f56]/30 transition-all group lg:col-span-2"
+                >
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#ff5f56]/20 mb-3 group-hover:scale-110 transition-transform">
+                    <Settings size={20} className="text-[#ff5f56]" />
+                  </div>
+                  <span className="text-xs font-bold text-[#ff5f56]">Super Admin</span>
+                </button>
+              )}
             </div>
           </section>
 

@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthGuard } from './components/AuthGuard';
 import { ProductGuard } from './components/ProductGuard';
+import { SuperAdminGuard } from './components/SuperAdminGuard';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
@@ -84,13 +85,15 @@ export default function App() {
           } 
         />
 
-        <Route 
-          path="/superadmin" 
+        <Route
+          path="/superadmin"
           element={
             <AuthGuard>
-              <SupAdmin />
+              <SuperAdminGuard>
+                <SupAdmin />
+              </SuperAdminGuard>
             </AuthGuard>
-          } 
+          }
         />
         
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
