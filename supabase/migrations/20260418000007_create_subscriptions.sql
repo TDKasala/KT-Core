@@ -22,10 +22,4 @@ create policy "Org members read own subscription"
   on public.subscriptions
   for select
   to authenticated
-  using (
-    exists (
-      select 1 from public.memberships
-      where memberships.organization_id = subscriptions.organization_id
-        and memberships.user_id = auth.uid()
-    )
-  );
+  using (exists (select 1 from public.memberships where memberships.organization_id = subscriptions.organization_id and memberships.user_id = auth.uid()));
