@@ -99,7 +99,24 @@ export async function getAllProducts() {
 }
 
 /**
+ * Fetches all organization_products links globally (Super Admin only).
+ */
+export async function getAllOrganizationProducts() {
+  const { data, error } = await supabase
+    .from('organization_products')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching all organization products:', error.message);
+    throw error;
+  }
+
+  return data as OrganizationProduct[];
+}
+
+/**
  * Explicitly sets a product's active state for an organization. 
+
  * Can be used globally by super_admins over any organization.
  */
 export async function setProductActiveState(product_id: string, organization_id: string, is_active: boolean) {

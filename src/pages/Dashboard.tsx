@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCurrentOrganization } from '../hooks/useCurrentOrganization';
 import { signOut } from '../lib/auth';
 import { supabase } from '../lib/supabaseClient';
+import { ShoppingCart, LayoutGrid, Settings, Users } from 'lucide-react';
 
 export default function Dashboard() {
   const { currentOrganization, role } = useCurrentOrganization();
   const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState('');
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     await signOut();
@@ -71,7 +74,42 @@ export default function Dashboard() {
           </button>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Section: POS Launch */}
+          <section className="bg-[#181818] border border-[#2e2e2e] rounded p-6 flex flex-col gap-6">
+            <h2 className="text-lg font-bold border-b border-[#2e2e2e] pb-4 mb-0 relative after:absolute after:bottom-0 after:left-0 after:w-8 after:h-[1px] after:bg-[#3ecf8e]">
+              Actions Rapides
+            </h2>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => navigate('/pos')}
+                className="flex flex-col items-center justify-center aspect-square rounded-xl bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 hover:bg-[#3ecf8e]/20 transition-all group"
+              >
+                <ShoppingCart size={32} className="text-[#3ecf8e] mb-3 group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-bold text-[#ededed]">Vendre</span>
+              </button>
+              
+              <button 
+                onClick={() => navigate('/inventory')}
+                className="flex flex-col items-center justify-center aspect-square rounded-xl bg-[#181818] border border-[#2e2e2e] hover:border-[#a0a0a0] transition-all group"
+              >
+                <LayoutGrid size={32} className="text-[#a0a0a0] mb-3 group-hover:text-[#ededed] transition-colors" />
+                <span className="text-xs font-bold text-[#ededed]">Produits</span>
+              </button>
+
+              <button 
+                onClick={() => navigate('/superadmin')}
+                className="flex flex-col items-center justify-center aspect-square rounded-xl bg-[#181818] border border-[#2e2e2e] hover:border-[#a0a0a0] hover:bg-[#ff5f56]/10 hover:border-[#ff5f56]/30 transition-all group lg:col-span-2"
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#ff5f56]/20 mb-3 group-hover:scale-110 transition-transform">
+                  <Settings size={20} className="text-[#ff5f56]" />
+                </div>
+                <span className="text-xs font-bold text-[#ff5f56]">Super Admin</span>
+              </button>
+            </div>
+          </section>
+
           <section className="bg-[#181818] border border-[#2e2e2e] rounded p-6">
             <h2 className="text-lg font-bold border-b border-[#2e2e2e] pb-4 mb-4 relative after:absolute after:bottom-0 after:left-0 after:w-8 after:h-[1px] after:bg-[#3ecf8e]">
               Espace de travail sélectionné

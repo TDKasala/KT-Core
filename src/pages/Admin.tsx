@@ -1,168 +1,187 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
-import { isSuperAdmin } from '../lib/auth';
-import { getAllOrganizations } from '../lib/organizations';
-import { getAllProducts, getOrganizationProducts, setProductActiveState, Product } from '../lib/products';
+import { 
+  LayoutDashboard, 
+  Receipt, 
+  Package, 
+  Box, 
+  Users, 
+  Settings,
+  Store,
+  Menu,
+  X,
+  ChevronDown
+} from 'lucide-react';
+import { useCurrentOrganization } from '../hooks/useCurrentOrganization';
+import { useBranchStore } from '../store/useBranchStore';
+import { getBranches } from '../components/branches';
+
+type AdminTab = 'dashboard' | 'sales' | 'products' | 'inventory' | 'staff' | 'settings';
 
 export default function Admin() {
   const navigate = useNavigate();
-  const [checking, setChecking] = useState(true);
-  const [orgs, setOrgs] = useState<any[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const [orgProductsMap, setOrgProductsMap] = useState<Record<string, boolean>>({});
+  const { currentOrganization, role } = useCurrentOrganization();
+  const { currentBranch, setCurrentBranch } = useBranchStore();
+  
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [branches, setBranches] = useState<any[]>([]);
 
   useEffect(() => {
-    let mounted = true;
-    async function checkAccess() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { navigate('/login'); return; }
-        
-        // Block access unless explicitly verified against super_admins table
-        const isAdmin = await isSuperAdmin(user.id);
-        if (!isAdmin) { navigate('/dashboard'); return; }
-        if (!mounted) return;
-        
-        // Fetch global state safely
-        const [fetchedOrgs, fetchedProducts] = await Promise.all([
-          getAllOrganizations(),
-          getAllProducts()
-        ]);
-        
-        setOrgs(fetchedOrgs);
-        setProducts(fetchedProducts);
-        setChecking(false);
-      } catch (err) {
-        console.error('Admin check failed', err);
-        navigate('/dashboard');
-      }
+    // Only let owners or admins see this? 
+    if (role && role !== 'owner' && role !== 'admin') {
+      navigate('/dashboard');
     }
-    checkAccess();
-    
-    return () => { mounted = false; };
-  }, [navigate]);
+  }, [role, navigate]);
 
   useEffect(() => {
-    if (!selectedOrgId) return;
-    
-    async function loadOrgProducts() {
-      // Intentionally passing the explicit selectedOrgId to bypass local hooks logic
-      const ops = await getOrganizationProducts(selectedOrgId);
-      const map: Record<string, boolean> = {};
-      ops.forEach(op => {
-        map[op.product_id] = op.is_active;
+    if (currentOrganization) {
+      getBranches(currentOrganization.id).then(data => {
+        setBranches(data || []);
+        if (data && data.length > 0 && !currentBranch) {
+          setCurrentBranch(data[0]);
+        }
       });
-      setOrgProductsMap(map);
     }
-    
-    loadOrgProducts();
-  }, [selectedOrgId]);
+  }, [currentOrganization]);
 
-  const handleToggle = async (productId: string, currentIsActive: boolean) => {
-    if (!selectedOrgId) return;
-    
-    try {
-      const newStatus = !currentIsActive;
-      // Optimistic UI update so controls feel instant
-      setOrgProductsMap(prev => ({ ...prev, [productId]: newStatus }));
-      await setProductActiveState(productId, selectedOrgId, newStatus);
-    } catch (err) {
-      console.error(err);
-      // Revert optimism on structural failure
-      setOrgProductsMap(prev => ({ ...prev, [productId]: currentIsActive }));
-    }
-  };
-
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
-        <div className="w-8 h-8 flex items-center justify-center gap-1">
-           <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-pulse" />
-           <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-pulse [animation-delay:0.2s]" />
-           <div className="w-2 h-2 bg-[#3ecf8e] rounded-full animate-pulse [animation-delay:0.4s]" />
-        </div>
-      </div>
-    );
-  }
+  const tabs = [
+    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+    { id: 'sales', label: 'Ventes', icon: Receipt },
+    { id: 'products', label: 'Produits', icon: Package },
+    { id: 'inventory', label: 'Stock', icon: Box },
+    { id: 'staff', label: 'Équipe', icon: Users },
+    { id: 'settings', label: 'Réglages', icon: Settings },
+  ] as const;
 
   return (
-    <div className="min-h-screen bg-[#121212] text-[#ededed] font-['Helvetica_Neue',Helvetica,Arial,sans-serif] p-8">
-      <div className="max-w-4xl mx-auto flex flex-col gap-8">
-        
-        <header className="flex items-center justify-between border-b border-[#2e2e2e] pb-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#3ecf8e]">Système Super Admin</h1>
-            <p className="text-[#a0a0a0] mt-1 text-sm">Protocole de contrôle global des espaces</p>
-          </div>
-          
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="font-mono text-[11px] uppercase tracking-wider text-[#a0a0a0] border border-[#2e2e2e] bg-[#181818] hover:bg-[#2e2e2e] px-4 py-2 rounded transition-colors"
-          >
-            Retour au tableau de bord
-          </button>
-        </header>
-
-        <div className="grid grid-cols-[250px_1fr] gap-6">
-          <div className="flex flex-col gap-2">
-            <h2 className="font-mono text-[10px] uppercase tracking-widest text-[#a0a0a0] mb-2 border-b border-[#2e2e2e] pb-2">Organisations</h2>
-            {orgs.map(org => (
-              <button
-                key={org.id}
-                onClick={() => setSelectedOrgId(org.id)}
-                className={`text-left text-sm px-3 py-2 rounded border transition-colors ${
-                  selectedOrgId === org.id 
-                    ? 'bg-[#3ecf8e]/10 border-[#3ecf8e] text-[#3ecf8e]' 
-                    : 'bg-[#181818] border-[#2e2e2e] text-[#ededed] hover:border-[#3ecf8e]/50'
-                }`}
-              >
-                <div className="font-medium truncate">{org.name}</div>
-                <div className="font-mono text-[10px] text-[#a0a0a0] capitalize mt-0.5">{org.type}</div>
-              </button>
-            ))}
-            {orgs.length === 0 && <div className="text-xs text-[#a0a0a0]">Aucune organisation trouvée.</div>}
-          </div>
-
-          <div className="bg-[#181818] border border-[#2e2e2e] rounded p-6 h-fit">
-            {!selectedOrgId ? (
-              <div className="text-[#a0a0a0] text-sm text-center py-10 font-mono">
-                Sélectionnez une organisation pour gérer les produits
-              </div>
-            ) : (
-              <>
-                <h2 className="text-lg font-bold border-b border-[#2e2e2e] pb-4 mb-4 relative after:absolute after:bottom-0 after:left-0 after:w-8 after:h-[1px] after:bg-[#3ecf8e]">
-                  Configuration des produits
-                </h2>
-                <div className="flex flex-col gap-4">
-                  {products.map(product => {
-                    const isActive = !!orgProductsMap[product.id];
-                    return (
-                      <div key={product.id} className="flex items-center justify-between border-b border-[#2e2e2e]/50 pb-4 last:border-0 last:pb-0">
-                        <div>
-                          <div className="text-[#ededed] text-sm font-medium">{product.name}</div>
-                          <div className="font-mono text-[10px] text-[#a0a0a0] mt-1">{product.code}</div>
-                        </div>
-                        <button
-                          onClick={() => handleToggle(product.id, isActive)}
-                          className={`font-mono text-[10px] uppercase tracking-wide px-3 py-1.5 rounded border transition-colors ${
-                            isActive 
-                              ? 'bg-[#3ecf8e]/10 border-[#3ecf8e] text-[#3ecf8e] hover:bg-[#ff5f56]/10 hover:border-[#ff5f56] hover:text-[#ff5f56]'
-                              : 'bg-[#000000] border-[#2e2e2e] text-[#a0a0a0] hover:border-[#3ecf8e] hover:text-[#3ecf8e]'
-                          }`}
-                        >
-                          {isActive ? 'Actif' : 'Désactivé'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+    <div className="flex h-screen bg-[#121212] text-[#ededed] font-['Inter',sans-serif]">
+      {/* Sidebar */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 w-64 bg-[#181818] border-r border-[#2e2e2e] flex flex-col shrink-0
+        transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="h-16 flex items-center px-6 border-b border-[#2e2e2e] mt-16 md:mt-0">
+          <div className="flex items-center gap-2 text-[#ededed] font-bold tracking-tight truncate">
+            <Store size={20} className="text-[#3ecf8e] shrink-0" />
+            <span className="truncate">{currentOrganization?.name || 'Mon Organisation'}</span>
           </div>
         </div>
-      </div>
+
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto w-full">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${
+                  isActive 
+                    ? 'bg-[#3ecf8e]/10 text-[#3ecf8e]' 
+                    : 'text-[#a0a0a0] hover:text-[#ededed] hover:bg-[#2e2e2e]'
+                }`}
+              >
+                <Icon size={18} />
+                {tab.label}
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-[#2e2e2e]">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="w-full text-center px-3 py-2.5 rounded-lg transition-colors text-xs font-mono tracking-widest uppercase text-[#a0a0a0] hover:text-[#ededed] hover:bg-[#2e2e2e]"
+          >
+            Quitter
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        
+        {/* Top Bar */}
+        <header className="h-16 border-b border-[#2e2e2e] bg-[#181818]/50 flex items-center justify-between px-4 md:px-8 shrink-0 relative z-30">
+          
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+              className="text-[#a0a0a0] md:hidden"
+            >
+              <Menu size={24} />
+            </button>
+            <h1 className="text-lg md:text-xl font-bold hidden md:block">
+              {tabs.find(t => t.id === activeTab)?.label}
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-4 ml-auto">
+            <div className="flex flex-col items-end mr-4 hidden sm:flex">
+              <span className="text-xs text-[#a0a0a0] font-mono leading-none mb-1">Espace</span>
+              <span className="text-sm font-medium leading-none">{currentOrganization?.name || '...'}</span>
+            </div>
+            
+            {/* Branch Selector */}
+            <div className="relative">
+              <select
+                value={currentBranch?.id || ''}
+                onChange={(e) => {
+                  const branch = branches.find(b => b.id === e.target.value);
+                  if (branch) setCurrentBranch(branch);
+                }}
+                className="appearance-none bg-[#121212] border border-[#2e2e2e] text-[#ededed] text-sm rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-[#3ecf8e] transition-colors"
+                disabled={branches.length === 0}
+              >
+                {branches.length === 0 && <option value="">Aucune succursale</option>}
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a0a0a0] pointer-events-none" />
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-6xl mx-auto">
+            {/* Page Header for Mobile */}
+            <h1 className="text-2xl font-bold mb-6 md:hidden">
+              {tabs.find(t => t.id === activeTab)?.label}
+            </h1>
+
+            {activeTab === 'dashboard' && <PlaceholderTab icon={LayoutDashboard} name="Tableau de bord" />}
+            {activeTab === 'sales' && <PlaceholderTab icon={Receipt} name="Ventes" />}
+            {activeTab === 'products' && <PlaceholderTab icon={Package} name="Produits" />}
+            {activeTab === 'inventory' && <PlaceholderTab icon={Box} name="Stock" />}
+            {activeTab === 'staff' && <PlaceholderTab icon={Users} name="Équipe" />}
+            {activeTab === 'settings' && <PlaceholderTab icon={Settings} name="Réglages" />}
+          </div>
+        </div>
+      </main>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
+        />
+      )}
+    </div>
+  );
+}
+
+function PlaceholderTab({ icon: Icon, name }: { icon: any, name: string }) {
+  return (
+    <div className="bg-[#181818] border border-[#2e2e2e] rounded-xl flex flex-col items-center justify-center py-32 text-[#a0a0a0]">
+      <Icon size={48} className="opacity-20 mb-4" />
+      <p className="font-mono text-sm uppercase tracking-widest text-center">{name}<br/><span className="text-[10px] lowercase opacity-50">Sera implémenté bientôt</span></p>
     </div>
   );
 }

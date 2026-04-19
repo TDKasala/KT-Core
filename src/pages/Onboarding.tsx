@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { createOrganizationWithOwner } from '../lib/organizations';
 import { ensureProfile } from '../lib/auth';
@@ -8,6 +9,7 @@ export default function Onboarding() {
   const [type, setType] = useState('retail');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +35,8 @@ export default function Onboarding() {
       ]);
       
       console.log('Onboarding: Success, redirecting...');
-      // Use replace for a cleaner transition that won't show 'loading' again if they hit back
-      window.location.replace('/dashboard');
+      // Soft navigation prevents iframe reload hooks breaking in sandbox
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       console.error('Onboarding Error:', err);
       setError(err.message || "Une erreur inattendue est survenue");
